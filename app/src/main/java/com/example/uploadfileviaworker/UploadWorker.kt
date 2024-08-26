@@ -25,14 +25,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
 import java.io.File
+import java.util.UUID
 import kotlin.math.round
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 
 @HiltWorker
 class UploadWorker @AssistedInject constructor(
     @Assisted val context: Context, @Assisted val parameters: WorkerParameters, private val uploadApiService: FileUploadApiService
 ) : CoroutineWorker(context, parameters) {
+
+    private var notificationId: Int = 0
 
     @SuppressLint("MissingPermission")
     override suspend fun doWork(): Result {
@@ -42,6 +46,7 @@ class UploadWorker @AssistedInject constructor(
             val fileUri = Uri.parse(parameters.inputData.getString("fileUri"))
             val file = File(context.filesDir, "${System.currentTimeMillis()}.${getFileExtension(fileUri)}")
             val fileName = file.name.toString()
+            notificationId = file.name.substringBeforeLast(".").toLong().toInt()
             setForeground(createForegroundInfo(file.name))
 
             context.contentResolver.openInputStream(fileUri)?.use { inputStream ->
@@ -51,13 +56,14 @@ class UploadWorker @AssistedInject constructor(
             }
 
 
-            val fileAsRequestBody = file.asRequestBodyWithProgress {
-                Log.d("MyWorker", "doWork: $it")
+            val fileAsRequestBody = file.asRequestBodyWithProgress { uploaded ->
+
+                Log.d("WorkerRequest", "doWork: Uploaded $uploaded")
 
                 NotificationManagerCompat.from(context).notify(
-                    1, getNotification(
+                    notificationId, getNotification(
                         fileName = fileName,
-                        progress = normalizeToPercentage(it)
+                        progress = uploaded.toInt()
                     )
                 )
             }
@@ -92,20 +98,16 @@ class UploadWorker @AssistedInject constructor(
         return extension
     }
 
-    private fun normalizeToPercentage(value: Float, minValue: Float = 0f, maxValue: Float = 1f): Int {
-        val normalized = (value - minValue) / (maxValue - minValue)
-        val result = round(normalized * 100).toInt()
-        Log.d("normalizeToPercentage:", result.toString())
-        return result
-    }
 
     private fun createForegroundInfo(fileName: String): ForegroundInfo =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ForegroundInfo(1, getNotification(fileName, 0), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            ForegroundInfo(
+                notificationId, getNotification(fileName, 0),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
         } else {
-            ForegroundInfo(1, getNotification(fileName, 0))
+            ForegroundInfo(notificationId, getNotification(fileName, 0))
         }
-
 
     private fun getNotification(fileName: String, progress: Int = 0): Notification = NotificationCompat.Builder(context, "uploader")
         .setSmallIcon(android.R.drawable.ic_notification_overlay)
