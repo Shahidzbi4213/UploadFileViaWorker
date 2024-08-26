@@ -19,6 +19,7 @@ import androidx.work.WorkerParameters
 import com.example.uploadfileviaworker.api.FileUploadApiService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -81,6 +82,8 @@ class UploadWorker @AssistedInject constructor(
                     file.delete()
                     Result.failure(Data.Builder().putString("error", response.errorBody().toString()).build())
                 }
+            } catch (e: CancellationException) {
+                Result.retry()
             } catch (e: java.io.InterruptedIOException) {
                 Result.retry()
             } catch (e: Exception) {

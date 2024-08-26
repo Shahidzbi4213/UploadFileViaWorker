@@ -1,5 +1,6 @@
 package com.example.uploadfileviaworker
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -24,26 +25,34 @@ fun File.asRequestBodyWithProgress(
         override fun contentLength(): Long = file.length()
 
         override fun writeTo(sink: BufferedSink) {
-            val totalLength = contentLength()
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            var uploadedBytes = 0L
+          try {
+              val totalLength = contentLength()
+              val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+              var uploadedBytes = 0L
 
-            FileInputStream(file).use { fis ->
-                var bytesRead = fis.read(buffer)
-                while (bytesRead != -1) {
-                    sink.write(buffer, 0, bytesRead)
-                    uploadedBytes += bytesRead
-                    val progress = (100 * uploadedBytes / totalLength)
+              FileInputStream(file).use { fis ->
+                  var bytesRead = fis.read(buffer)
+                  while (bytesRead != -1) {
+                      sink.write(buffer, 0, bytesRead)
+                      uploadedBytes += bytesRead
+                      val progress = (100 * uploadedBytes / totalLength)
 
-                    runBlocking {
-                        withContext(Dispatchers.Main) {
-                            progressCallback(progress)
-                        }
-                    }
+                      runBlocking {
+                          withContext(Dispatchers.Main) {
+                              progressCallback(progress)
+                          }
+                      }
 
-                    bytesRead = fis.read(buffer)
-                }
-            }
+                      bytesRead = fis.read(buffer)
+                  }
+              }
+          }catch (e:Exception){
+              Log.d("MyWorkResponse", "asRequestBodyWithProgress: ${e.message}")
+          }catch (e:java.lang.Exception){
+              Log.d("MyWorkResponse", "asRequestBodyWithProgress: ${e.message}")
+          }catch (e:java.io.IOException){
+              Log.d("MyWorkResponse", "asRequestBodyWithProgress: ${e.message}")
+          }
         }
     }
 }
